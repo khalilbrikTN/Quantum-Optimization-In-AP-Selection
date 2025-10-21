@@ -1,0 +1,696 @@
+{
+    "cells": [
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "# Visualization Notebook\n",
+                "\n",
+                "This notebook produces all visualizations for the WiFi localization results.\n",
+                "\n",
+                "**Prerequisites:** Run RUNNER.ipynb first to generate the results data and save them to `data/results/`."
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## Setup and Imports"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": 1,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "import numpy as np\n",
+                "import pandas as pd\n",
+                "import matplotlib.pyplot as plt\n",
+                "import seaborn as sns\n",
+                "from pathlib import Path\n",
+                "import warnings\n",
+                "\n",
+                "warnings.filterwarnings('ignore')"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": 2,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "from code_resources.Visualizations_Functions import (\n",
+                "    plot_ap_importance,\n",
+                "    plot_redundancy_matrix,\n",
+                "    plot_error_comparison, \n",
+                "    plot_floor_accuracy_comparison, \n",
+                "    plot_error_range_comparison, \n",
+                "    plot_radar_chart, \n",
+                "    plot_combined_error_and_accuracy,\n",
+                "    plot_building_fingerprints_3d,\n",
+                "    plot_building_comparison_3d\n",
+                ")\n",
+                "from code_resources.data_loaders import load_preprocessed_data, load_all_precomputed_data\n",
+                "from code_resources.ML_post_processing import train_regressor\n",
+                "from code_resources import pre_processing"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## Load Pre-computed Data and Results"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": 3,
+            "metadata": {},
+            "outputs": [
+                {
+                    "name": "stdout",
+                    "output_type": "stream",
+                    "text": [
+                        "Loading results from: data\\results\\qubo_results.xlsx\n",
+                        "\n",
+                        "Loaded results for 5 methods\n",
+                        "  Importance_Method  Num_APs  \\\n",
+                        "0       mutual_info       20   \n",
+                        "1           entropy       20   \n",
+                        "2           average       20   \n",
+                        "3               max       20   \n",
+                        "4          variance       20   \n",
+                        "\n",
+                        "                                        Selected_APs  Mean_3D_Error_m  \\\n",
+                        "0  WAP015, WAP103, WAP107, WAP115, WAP119, WAP135...        19.650160   \n",
+                        "1  WAP016, WAP037, WAP088, WAP091, WAP112, WAP113...        15.988761   \n",
+                        "2  WAP016, WAP027, WAP088, WAP089, WAP102, WAP104...        15.143034   \n",
+                        "3  WAP084, WAP105, WAP106, WAP108, WAP112, WAP113...        16.673667   \n",
+                        "4  WAP023, WAP101, WAP102, WAP105, WAP107, WAP114...        16.747241   \n",
+                        "\n",
+                        "   Median_3D_Error_m  Min_Error_m  Max_Error_m  Floor_Accuracy  \\\n",
+                        "0          13.634130     0.326116    83.371049        0.628664   \n",
+                        "1          11.762935     0.977198    82.903321        0.589577   \n",
+                        "2          11.384861     0.288419    75.159108        0.661238   \n",
+                        "3          12.684746     0.705999    83.485156        0.690554   \n",
+                        "4          12.128064     0.763576    83.279082        0.651466   \n",
+                        "\n",
+                        "   QUBO_Duration_s  \n",
+                        "0        51.971995  \n",
+                        "1        54.201057  \n",
+                        "2        56.646418  \n",
+                        "3        55.566925  \n",
+                        "4        55.215060  \n"
+                    ]
+                }
+            ],
+            "source": [
+                "# Load the saved results from RUNNER.ipynb\n",
+                "results_dir = Path('data') / 'results'\n",
+                "\n",
+                "# Load the results file\n",
+                "results_file = results_dir / 'qubo_results.xlsx'\n",
+                "if not results_file.exists():\n",
+                "    raise FileNotFoundError(f\"Results file not found: {results_file}. Please run RUNNER.ipynb first.\")\n",
+                "\n",
+                "print(f\"Loading results from: {results_file}\")\n",
+                "results_df = pd.read_excel(results_file)\n",
+                "print(f\"\\nLoaded results for {len(results_df)} methods\")\n",
+                "print(results_df)"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": 4,
+            "metadata": {},
+            "outputs": [
+                {
+                    "name": "stdout",
+                    "output_type": "stream",
+                    "text": [
+                        "Converted to dictionary format:\n",
+                        "mutual_info: 20 APs, Mean Error: 19.65m\n",
+                        "entropy: 20 APs, Mean Error: 15.99m\n",
+                        "average: 20 APs, Mean Error: 15.14m\n",
+                        "max: 20 APs, Mean Error: 16.67m\n",
+                        "variance: 20 APs, Mean Error: 16.75m\n"
+                    ]
+                }
+            ],
+            "source": [
+                "# Convert DataFrame back to dictionary format for plotting functions\n",
+                "results = {}\n",
+                "for _, row in results_df.iterrows():\n",
+                "    method = row['Importance_Method']\n",
+                "    results[method] = {\n",
+                "        'selected_aps': row['Selected_APs'].split(', '),\n",
+                "        'mean_3d_error': row['Mean_3D_Error_m'],\n",
+                "        'median_3d_error': row['Median_3D_Error_m'],\n",
+                "        'real_min_m': row['Min_Error_m'],\n",
+                "        'real_max_m': row['Max_Error_m'],\n",
+                "        'floor_accuracy': row['Floor_Accuracy'],\n",
+                "        'duration': row['QUBO_Duration_s']\n",
+                "    }\n",
+                "\n",
+                "print(\"Converted to dictionary format:\")\n",
+                "for method, metrics in results.items():\n",
+                "    print(f\"{method}: {len(metrics['selected_aps'])} APs, Mean Error: {metrics['mean_3d_error']:.2f}m\")"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": 5,
+            "metadata": {},
+            "outputs": [
+                {
+                    "name": "stdout",
+                    "output_type": "stream",
+                    "text": [
+                        "\n",
+                        "Number of APs selected (k): 20\n"
+                    ]
+                }
+            ],
+            "source": [
+                "# Extract number of APs selected from the results\n",
+                "k = len(results[list(results.keys())[0]]['selected_aps'])\n",
+                "print(f\"\\nNumber of APs selected (k): {k}\")"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## Importance Scores Visualizations"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": 6,
+            "metadata": {},
+            "outputs": [
+                {
+                    "name": "stdout",
+                    "output_type": "stream",
+                    "text": [
+                        "Visualizing redundancy (correlation) matrix...\n"
+                    ]
+                },
+                {
+                    "ename": "NameError",
+                    "evalue": "name 'redundancy_matrix' is not defined",
+                    "output_type": "error",
+                    "traceback": [
+                        "\u001b[1;31m---------------------------------------------------------------------------\u001b[0m",
+                        "\u001b[1;31mNameError\u001b[0m                                 Traceback (most recent call last)",
+                        "Cell \u001b[1;32mIn[6], line 3\u001b[0m\n\u001b[0;32m      1\u001b[0m \u001b[38;5;66;03m# Plot redundancy matrix heatmap\u001b[39;00m\n\u001b[0;32m      2\u001b[0m \u001b[38;5;28mprint\u001b[39m(\u001b[38;5;124m\"\u001b[39m\u001b[38;5;124mVisualizing redundancy (correlation) matrix...\u001b[39m\u001b[38;5;124m\"\u001b[39m)\n\u001b[1;32m----> 3\u001b[0m plot_redundancy_matrix(\u001b[43mredundancy_matrix\u001b[49m)\n",
+                        "\u001b[1;31mNameError\u001b[0m: name 'redundancy_matrix' is not defined"
+                    ]
+                }
+            ],
+            "source": [
+                "# Plot redundancy matrix heatmap\n",
+                "print(\"Visualizing redundancy (correlation) matrix...\")\n",
+                "plot_redundancy_matrix(redundancy_matrix)"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot importance scores for each method\n",
+                "print(\"Visualizing importance scores for each method...\\n\")\n",
+                "\n",
+                "for label in ['mutual_info', 'entropy', 'average', 'max', 'variance']:\n",
+                "    print(f\"Plotting {label} importance scores...\")\n",
+                "    plot_ap_importance(importance_dicts[label])"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": "# Load importance scores and redundancy matrix for visualization\nimportance_dicts, redundancy_matrix = load_all_precomputed_data()"
+        },
+        {
+            "cell_type": "code",
+            "source": "# Plot importance scores for each method\nprint(\"\\nVisualizing importance scores for each method...\\n\")\n\nfor label in ['mutual_info', 'entropy', 'average', 'max', 'variance']:\n    print(f\"Plotting {label} importance scores...\")\n    plot_ap_importance(importance_dicts[label])",
+            "metadata": {},
+            "execution_count": null,
+            "outputs": []
+        },
+        {
+            "cell_type": "code",
+            "source": "# Plot redundancy matrix heatmap\nprint(\"Visualizing redundancy (correlation) matrix...\")\nplot_redundancy_matrix(redundancy_matrix)",
+            "metadata": {},
+            "execution_count": null,
+            "outputs": []
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 2D Comparison Plots"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot error comparison (median 3D error)\n",
+                "plot_error_comparison(results)"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot floor accuracy comparison\n",
+                "plot_floor_accuracy_comparison(results)"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot error range comparison\n",
+                "plot_error_range_comparison(results)"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot radar chart\n",
+                "plot_radar_chart(results)"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot combined error and accuracy\n",
+                "plot_combined_error_and_accuracy(results)"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## Load Data for 3D Visualizations\n",
+                "\n",
+                "We need to load the preprocessed data and results to create 3D visualizations."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Load preprocessed data for 3D visualizations\n",
+                "building_id = 1\n",
+                "\n",
+                "rssi_train, coords_train, rssi_val, coords_val, ap_columns = load_preprocessed_data(\n",
+                "    building_id=building_id,\n",
+                "    use_pickle=True  # True = fast (pickle), False = slower (Excel)\n",
+                ")\n",
+                "\n",
+                "# Get normalization parameters\n",
+                "LON_MIN = pre_processing.LON_MIN\n",
+                "LON_MAX = pre_processing.LON_MAX\n",
+                "LAT_MIN = pre_processing.LAT_MIN\n",
+                "LAT_MAX = pre_processing.LAT_MAX\n",
+                "FLOOR_HEIGHT = 3.0\n",
+                "\n",
+                "print(f\"✓ Loaded preprocessed data for Building {building_id}\")\n",
+                "print(f\"  Training samples: {rssi_train.shape[0]}\")\n",
+                "print(f\"  Validation samples: {rssi_val.shape[0]}\")\n",
+                "print(f\"  Number of APs: {len(ap_columns)}\")"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Note: The 'results' dictionary already contains selected APs from loading the Excel file\n",
+                "# We can use it directly for 3D visualizations\n",
+                "\n",
+                "print(f\"✓ Results dictionary contains {len(results)} methods with selected APs\")\n",
+                "for method in results.keys():\n",
+                "    print(f\"  - {method}: {len(results[method]['selected_aps'])} APs\")"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 3D Visualization - Building Fingerprints"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot training data fingerprints in 3D - colored by floor\n",
+                "print(\"Visualizing training fingerprints (colored by floor)...\")\n",
+                "fig, ax = plot_building_fingerprints_3d(\n",
+                "    coords_train,\n",
+                "    color_by='floor',\n",
+                "    figsize=(14, 10),\n",
+                "    title='Building 1 - Training Fingerprints (Colored by Floor)',\n",
+                "    elev=25,\n",
+                "    azim=45,\n",
+                "    alpha=0.6,\n",
+                "    marker_size=30\n",
+                ")"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot validation data fingerprints in 3D - colored by floor\n",
+                "print(\"Visualizing validation fingerprints (colored by floor)...\")\n",
+                "fig, ax = plot_building_fingerprints_3d(\n",
+                "    coords_val,\n",
+                "    color_by='floor',\n",
+                "    figsize=(14, 10),\n",
+                "    title='Building 1 - Validation Fingerprints (Colored by Floor)',\n",
+                "    elev=25,\n",
+                "    azim=45,\n",
+                "    alpha=0.7,\n",
+                "    marker_size=50\n",
+                ")"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot training data colored by measurement density\n",
+                "print(\"Visualizing training fingerprints (colored by measurement density)...\")\n",
+                "\n",
+                "fig, ax = plot_building_fingerprints_3d(\n",
+                "    coords_train,\n",
+                "    color_by='density',\n",
+                "    figsize=(14, 10),\n",
+                "    title='Building 1 - Training Fingerprints (Colored by Measurement Density)',\n",
+                "    elev=25,\n",
+                "    azim=45,\n",
+                "    alpha=0.6,\n",
+                "    marker_size=30\n",
+                ")"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot with denormalized coordinates (real-world scale in meters)\n",
+                "print(\"Visualizing training fingerprints with denormalized coordinates...\")\n",
+                "\n",
+                "fig, ax = plot_building_fingerprints_3d(\n",
+                "    coords_train,\n",
+                "    color_by='floor',\n",
+                "    denormalize=True,\n",
+                "    lon_min=LON_MIN,\n",
+                "    lon_max=LON_MAX,\n",
+                "    lat_min=LAT_MIN,\n",
+                "    lat_max=LAT_MAX,\n",
+                "    floor_height=FLOOR_HEIGHT,\n",
+                "    figsize=(14, 10),\n",
+                "    title='Building 1 - Training Fingerprints (Real-World Coordinates)',\n",
+                "    elev=25,\n",
+                "    azim=45,\n",
+                "    alpha=0.6,\n",
+                "    marker_size=30\n",
+                ")"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot training data colored by RSSI strength of selected APs\n",
+                "# Using the first method available in results\n",
+                "first_method = list(results.keys())[0]\n",
+                "print(f\"Visualizing training fingerprints (colored by RSSI of selected APs - {first_method} method)...\")\n",
+                "\n",
+                "selected_aps_first = results[first_method]['selected_aps']\n",
+                "\n",
+                "fig, ax = plot_building_fingerprints_3d(\n",
+                "    coords_train,\n",
+                "    rssi_data=rssi_train,\n",
+                "    selected_aps=selected_aps_first,\n",
+                "    color_by='rssi',\n",
+                "    figsize=(14, 10),\n",
+                "    title=f'Building 1 - Training Fingerprints (Colored by Avg RSSI of {len(selected_aps_first)} Selected APs - {first_method})',\n",
+                "    elev=25,\n",
+                "    azim=45,\n",
+                "    alpha=0.6,\n",
+                "    marker_size=30\n",
+                ")"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 3D Visualization - True vs Predicted Comparisons"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Generate predictions for all methods and create 3D visualizations\n",
+                "output_viz_dir = Path('data') / 'output_data' / 'visualizations_3d'\n",
+                "output_viz_dir.mkdir(parents=True, exist_ok=True)\n",
+                "\n",
+                "print(\"Comparing different importance methods in 3D...\\n\")\n",
+                "\n",
+                "for method_name in results.keys():\n",
+                "    print(f\"Generating 3D comparison for '{method_name}' method...\")\n",
+                "    \n",
+                "    # Get predictions for this method\n",
+                "    selected_aps_method = results[method_name]['selected_aps']\n",
+                "    models_method, predictions_method = train_regressor(\n",
+                "        rssi_train, coords_train, \n",
+                "        rssi_val, coords_val, \n",
+                "        selected_aps_method\n",
+                "    )\n",
+                "    \n",
+                "    # Plot comparison\n",
+                "    fig, ax = plot_building_comparison_3d(\n",
+                "        coords_val,\n",
+                "        predictions_method['rf_val'],\n",
+                "        denormalize=True,\n",
+                "        lon_min=LON_MIN,\n",
+                "        lon_max=LON_MAX,\n",
+                "        lat_min=LAT_MIN,\n",
+                "        lat_max=LAT_MAX,\n",
+                "        floor_height=FLOOR_HEIGHT,\n",
+                "        max_points=300,\n",
+                "        figsize=(16, 10),\n",
+                "        title=f'Building 1 - {method_name.capitalize()} Method (k={k})',\n",
+                "        save_path=output_viz_dir / f'3d_comparison_{method_name}.png'\n",
+                "    )\n",
+                "\n",
+                "print(f\"\\n✓ All 3D visualizations saved to: {output_viz_dir}\")"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot best method in detail (select the method with lowest mean 3D error)\n",
+                "best_method = min(results.keys(), key=lambda m: results[m]['mean_3d_error'])\n",
+                "print(f\"Best method by mean 3D error: {best_method} ({results[best_method]['mean_3d_error']:.2f}m)\")\n",
+                "\n",
+                "selected_aps_best = results[best_method]['selected_aps']\n",
+                "models_best, predictions_best = train_regressor(\n",
+                "    rssi_train, coords_train, \n",
+                "    rssi_val, coords_val, \n",
+                "    selected_aps_best\n",
+                ")\n",
+                "\n",
+                "preds_val = predictions_best['rf_val']\n",
+                "\n",
+                "print(f\"Using {len(selected_aps_best)} selected APs from '{best_method}' importance method\")\n",
+                "print(f\"True coordinates shape: {coords_val.shape}\")\n",
+                "print(f\"Predicted coordinates shape: {preds_val.shape}\")"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot true vs predicted locations in 3D (normalized coordinates)\n",
+                "print(\"Plotting true vs predicted locations (normalized coordinates)...\")\n",
+                "\n",
+                "fig, ax = plot_building_comparison_3d(\n",
+                "    coords_val,\n",
+                "    preds_val,\n",
+                "    denormalize=False,\n",
+                "    max_points=500,\n",
+                "    figsize=(16, 10),\n",
+                "    title=f'Building 1 - True vs Predicted Locations ({best_method} method, k={k})'\n",
+                ")"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Plot true vs predicted locations in 3D (denormalized - real-world coordinates)\n",
+                "print(\"Plotting true vs predicted locations (real-world coordinates in meters)...\")\n",
+                "\n",
+                "fig, ax = plot_building_comparison_3d(\n",
+                "    coords_val,\n",
+                "    preds_val,\n",
+                "    denormalize=True,\n",
+                "    lon_min=LON_MIN,\n",
+                "    lon_max=LON_MAX,\n",
+                "    lat_min=LAT_MIN,\n",
+                "    lat_max=LAT_MAX,\n",
+                "    floor_height=FLOOR_HEIGHT,\n",
+                "    max_points=500,\n",
+                "    figsize=(16, 10),\n",
+                "    title=f'Building 1 - True vs Predicted (Real-World Scale, {best_method} method, k={k})'\n",
+                ")"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## Save All Visualizations\n",
+                "\n",
+                "Optionally save all 2D plots to files for use in papers/presentations."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": null,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Create output directory for 2D plots\n",
+                "output_2d_dir = Path('data') / 'output_data' / 'visualizations_2d'\n",
+                "output_2d_dir.mkdir(parents=True, exist_ok=True)\n",
+                "\n",
+                "print(\"Saving 2D visualizations...\\n\")\n",
+                "\n",
+                "# Error comparison\n",
+                "print(\"- Saving error comparison...\")\n",
+                "plot_error_comparison(results, save_path=output_2d_dir / 'error_comparison.png')\n",
+                "\n",
+                "# Floor accuracy comparison\n",
+                "print(\"- Saving floor accuracy comparison...\")\n",
+                "plot_floor_accuracy_comparison(results, save_path=output_2d_dir / 'floor_accuracy_comparison.png')\n",
+                "\n",
+                "# Error range comparison\n",
+                "print(\"- Saving error range comparison...\")\n",
+                "plot_error_range_comparison(results, save_path=output_2d_dir / 'error_range_comparison.png')\n",
+                "\n",
+                "# Radar chart\n",
+                "print(\"- Saving radar chart...\")\n",
+                "plot_radar_chart(results, save_path=output_2d_dir / 'radar_chart.png')\n",
+                "\n",
+                "# Combined error and accuracy\n",
+                "print(\"- Saving combined error and accuracy...\")\n",
+                "plot_combined_error_and_accuracy(results, save_path=output_2d_dir / 'combined_error_accuracy.png')\n",
+                "\n",
+                "print(f\"\\n✓ All 2D visualizations saved to: {output_2d_dir}\")"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## Summary\n",
+                "\n",
+                "This notebook has generated:\n",
+                "\n",
+                "**Importance Scores Visualizations:**\n",
+                "- Bar plots for 5 importance methods (mutual_info, entropy, average, max, variance)\n",
+                "- Redundancy matrix heatmap\n",
+                "\n",
+                "**2D Results Comparison Plots:**\n",
+                "- Error comparison (median 3D error)\n",
+                "- Floor accuracy comparison\n",
+                "- Error range comparison (min to max)\n",
+                "- Radar chart (normalized metrics)\n",
+                "- Combined error and accuracy plot\n",
+                "\n",
+                "**3D Visualizations:**\n",
+                "- Building fingerprints (colored by floor)\n",
+                "- Building fingerprints (colored by measurement density)\n",
+                "- Building fingerprints (real-world coordinates)\n",
+                "- Building fingerprints (colored by RSSI)\n",
+                "- True vs predicted comparisons for all methods\n",
+                "- Detailed true vs predicted for best method\n",
+                "\n",
+                "**Output Locations:**\n",
+                "- 2D plots: `data/output_data/visualizations_2d/`\n",
+                "- 3D plots: `data/output_data/visualizations_3d/`"
+            ]
+        }
+    ],
+    "metadata": {
+        "kernelspec": {
+            "display_name": "Python 3",
+            "language": "python",
+            "name": "python3"
+        },
+        "language_info": {
+            "codemirror_mode": {
+                "name": "ipython",
+                "version": 3
+            },
+            "file_extension": ".py",
+            "mimetype": "text/x-python",
+            "name": "python",
+            "nbconvert_exporter": "python",
+            "pygments_lexer": "ipython3",
+            "version": "3.11.0"
+        }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 4
+}
