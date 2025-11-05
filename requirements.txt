@@ -1,0 +1,22 @@
+# Quantum and Optimization Libraries
+# NOTE: openjij may not support Python 3.14 yet - install latest available version
+openjij
+dwave-ocean-sdk
+dimod
+
+# Machine Learning and Data Science
+scikit-learn
+numpy
+pandas
+scipy
+
+# Visualization
+matplotlib
+seaborn
+
+# Data Handling and I/O
+openpyxl
+
+# Jupyter Notebook (optional, if not already installed)
+jupyter
+notebook
