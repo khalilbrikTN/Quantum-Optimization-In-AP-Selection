@@ -1,0 +1,4 @@
+Building_ID,Train_Samples,Val_Samples,Num_APs,Status
+0,5249,536,520,Success
+1,5196,307,520,Success
+2,9492,268,520,Success

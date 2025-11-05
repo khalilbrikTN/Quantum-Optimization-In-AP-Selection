@@ -1,0 +1,7 @@
+Parameter,Value,Description
+LON_MIN,-7415.163003530353,Minimum longitude value for denormalization
+LON_MAX,-7299.786516730871,Maximum longitude value for denormalization
+LAT_MIN,4864745.745015971,Minimum latitude value for denormalization
+LAT_MAX,4864861.7561028525,Maximum latitude value for denormalization
+FLOOR_HEIGHT,3.0,Height of each floor in meters
+BUILDING_ID,2.0,Building ID used for preprocessing
