@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from .pre_processing import denormalize_col
+from scripts.data.pre_processing import denormalize_col
 
 def evaluate_and_print_results(solver, coords_train, coords_val,
                                predictions_openjij, selected_aps_openjij,

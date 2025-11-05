@@ -3,12 +3,12 @@ from datetime import datetime
 import os
 
 
-from pre_processing import *
-from Importance import *
-from Redundancy import *
-from QUBO import *
-from ML_post_processing import *
-from Visualizations_Functions import *
+from scripts.data.pre_processing import *
+from scripts.optimization.Importance import *
+from scripts.optimization.Redundancy import *
+from scripts.optimization.QUBO import *
+from scripts.ml.ML_post_processing import *
+from scripts.visualization.Visualizations_Functions import *
 
 
 def run_multi_budget_experiment(df_train_path, df_validation_path,
