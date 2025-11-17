@@ -69,18 +69,30 @@ def calculate_3d_distance_error(y_true, y_pred):
     return distance_errors, metrics
 
 
-def calculate_comprehensive_metrics(y_true, y_pred, 
-                                   lon_min, lon_max, 
-                                   lat_min, lat_max, 
+def calculate_comprehensive_metrics(y_true, y_pred,
+                                   lon_min, lon_max,
+                                   lat_min, lat_max,
                                    floor_height):
     """
     Calculate both normalized and corrected real-world metrics
+
+    Returns:
+    --------
+    norm_errors : array
+        Normalized distance errors
+    real_errors : array
+        Real-world distance errors in meters
+    metrics : dict
+        Dictionary containing all metrics including:
+        - floor_accuracy_0: Exact floor accuracy
+        - floor_accuracy_1: Within 1 floor accuracy
+        - floor_accuracy_2: Within 2 floors accuracy
     """
     # Normalized metrics
     norm_errors = np.sqrt(np.sum((y_true - y_pred)**2, axis=1))
 
-    # Corrected real-world metrics
-    real_errors, floor_accuracy = denormalize_and_calculate_real_distance(
+    # Corrected real-world metrics with all floor accuracies
+    real_errors, floor_accuracy_0, floor_accuracy_1, floor_accuracy_2 = denormalize_and_calculate_real_distance(
         y_true, y_pred, lon_min, lon_max, lat_min, lat_max, floor_height
     )
 
@@ -96,7 +108,14 @@ def calculate_comprehensive_metrics(y_true, y_pred,
         'real_median_m': np.median(real_errors),
         'real_90th_m': np.percentile(real_errors, 90),
         'real_95th_m': np.percentile(real_errors, 95),
-        'floor_accuracy': floor_accuracy,
+
+        # Floor accuracy metrics
+        'floor_accuracy_0': floor_accuracy_0,  # Exact floor
+        'floor_accuracy_1': floor_accuracy_1,  # Within 1 floor
+        'floor_accuracy_2': floor_accuracy_2,  # Within 2 floors
+
+        # Keep legacy name for backward compatibility
+        'floor_accuracy': floor_accuracy_0,
 
         # Additional stats
         'real_min_m': np.min(real_errors),
@@ -184,42 +203,62 @@ def evaluate_comprehensive_performance(coords_train, coords_val, predictions, se
     return results
 
 
-def denormalize_and_calculate_real_distance(y_true_norm, y_pred_norm, 
-                                            lon_min, lon_max, 
-                                            lat_min, lat_max, 
+def denormalize_and_calculate_real_distance(y_true_norm, y_pred_norm,
+                                            lon_min, lon_max,
+                                            lat_min, lat_max,
                                             floor_height):
     """
     Corrected real-world distance calculation using manual denormalization
+
+    Returns:
+    --------
+    real_distance_errors : array
+        3D distance errors in meters
+    floor_accuracy_0 : float
+        Exact floor accuracy (predicted floor == actual floor)
+    floor_accuracy_1 : float
+        Within 1 floor accuracy (|predicted - actual| <= 1)
+    floor_accuracy_2 : float
+        Within 2 floors accuracy (|predicted - actual| <= 2)
     """
     # Denormalize longitude and latitude
     lon_true = denormalize_col(y_true_norm[:, 0], lon_min, lon_max)
     lat_true = denormalize_col(y_true_norm[:, 1], lat_min, lat_max)
-    
+
     lon_pred = denormalize_col(y_pred_norm[:, 0], lon_min, lon_max)
     lat_pred = denormalize_col(y_pred_norm[:, 1], lat_min, lat_max)
-    
+
     # Floor is NOT normalized
     floor_true = y_true_norm[:, 2]
     floor_pred = y_pred_norm[:, 2]
-    
+
     # Calculate 2D horizontal distance (UTM coordinates in meters)
     lon_diff_m = lon_true - lon_pred
     lat_diff_m = lat_true - lat_pred
     horizontal_distance = np.sqrt(lat_diff_m**2 + lon_diff_m**2)
-    
+
     # Vertical distance using floor height
     floor_diff = floor_true - floor_pred
     vertical_distance_m = np.abs(floor_diff) * floor_height
-    
+
     # 3D Euclidean distance
     real_distance_errors = np.sqrt(horizontal_distance**2 + vertical_distance_m**2)
-    
-    # Floor accuracy
+
+    # Floor accuracy calculations
     floor_predicted_rounded = np.round(floor_pred).astype(int)
     floor_true_rounded = np.round(floor_true).astype(int)
-    floor_accuracy = np.mean(floor_predicted_rounded == floor_true_rounded)
-    
-    return real_distance_errors, floor_accuracy
+    floor_diff_abs = np.abs(floor_predicted_rounded - floor_true_rounded)
+
+    # Exact floor (0-floor distance)
+    floor_accuracy_0 = np.mean(floor_diff_abs == 0)
+
+    # Within 1 floor
+    floor_accuracy_1 = np.mean(floor_diff_abs <= 1)
+
+    # Within 2 floors
+    floor_accuracy_2 = np.mean(floor_diff_abs <= 2)
+
+    return real_distance_errors, floor_accuracy_0, floor_accuracy_1, floor_accuracy_2
 
 
 
