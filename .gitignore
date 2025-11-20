@@ -44,3 +44,7 @@ Thumbs.db
 # *.pkl
 # *.csv
 # *.xlsx
+
+# Temporary files
+temp_*.json
+*.tmp

@@ -11,6 +11,54 @@ from pathlib import Path
 import pickle
 
 
+def get_project_root():
+    """
+    Find the project root directory by looking for characteristic files.
+
+    This function searches upward from the current file location until it finds
+    a directory containing 'data/' and 'scripts/' folders, which indicates the
+    project root.
+
+    Returns:
+    --------
+    Path : Absolute path to the project root directory
+    """
+    # Start from this file's directory
+    current = Path(__file__).resolve().parent
+
+    # Search upward for the project root
+    # Look for directories that contain both 'data' and 'scripts' folders
+    for parent in [current] + list(current.parents):
+        if (parent / 'data').exists() and (parent / 'scripts').exists():
+            return parent
+
+    # Fallback: if not found, assume we're already in project root
+    # or use current working directory
+    if (Path.cwd() / 'data').exists():
+        return Path.cwd()
+
+    # Last resort: go up from __file__ location
+    # Assuming structure: project_root/scripts/data/data_loaders.py
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def resolve_data_path(relative_path):
+    """
+    Convert a relative data path to an absolute path based on project root.
+
+    Parameters:
+    -----------
+    relative_path : str or Path
+        Relative path from project root (e.g., 'data/output_data/...')
+
+    Returns:
+    --------
+    Path : Absolute path to the data file/directory
+    """
+    project_root = get_project_root()
+    return project_root / relative_path
+
+
 def load_importance_dict_from_csv(filepath):
     """
     Load importance dictionary from CSV file
@@ -66,7 +114,8 @@ def load_all_importance_scores(base_dir='data/output_data/importance_scores'):
             'variance': {AP: score, ...}
         }
     """
-    importance_dir = Path(base_dir)
+    # Convert to absolute path
+    importance_dir = resolve_data_path(base_dir)
 
     importance_methods = ['entropy', 'average', 'median', 'max', 'variance', 'mutual_info']
     importance_dicts = {}
@@ -75,7 +124,7 @@ def load_all_importance_scores(base_dir='data/output_data/importance_scores'):
         filepath = importance_dir / f'{method}_importance_dict.csv'
         if filepath.exists():
             importance_dicts[method] = load_importance_dict_from_csv(filepath)
-            print(f"✓ Loaded {len(importance_dicts[method])} APs for {method} importance")
+            print(f"[OK] Loaded {len(importance_dicts[method])} APs for {method} importance")
         else:
             print(f"⚠ Warning: {filepath} not found, skipping {method}")
 
@@ -96,7 +145,8 @@ def load_redundancy_matrix(base_dir='data/output_data/redundancy_scores'):
     --------
     DataFrame : redundancy matrix
     """
-    redundancy_dir = Path(base_dir)
+    # Convert to absolute path
+    redundancy_dir = resolve_data_path(base_dir)
     filepath = redundancy_dir / 'redundancy_matrix.csv'
 
     if not filepath.exists():
@@ -106,7 +156,7 @@ def load_redundancy_matrix(base_dir='data/output_data/redundancy_scores'):
         )
 
     matrix = load_redundancy_matrix_from_csv(filepath)
-    print(f"✓ Loaded redundancy matrix with shape: {matrix.shape}")
+    print(f"[OK] Loaded redundancy matrix with shape: {matrix.shape}")
     return matrix
 
 
@@ -147,7 +197,7 @@ def load_all_precomputed_data(importance_dir='data/output_data/importance_scores
     print("\nLoading redundancy matrix...")
     redundancy_matrix = load_redundancy_matrix(redundancy_dir)
 
-    print("\n✓ All data loaded successfully!")
+    print("\n[OK] All data loaded successfully!")
     print("="*60)
 
     return importance_dicts, redundancy_matrix
@@ -167,7 +217,7 @@ def save_importance_dict_to_csv(importance_dict, filepath):
     """
     df = pd.DataFrame(list(importance_dict.items()), columns=['AP', 'Score'])
     df.to_csv(filepath, index=False)
-    print(f"✓ Saved importance dictionary to {filepath}")
+    print(f"[OK] Saved importance dictionary to {filepath}")
 
 
 def save_all_importance_dicts(importance_dicts, output_dir='data/output_data/importance_scores'):
@@ -181,14 +231,15 @@ def save_all_importance_dicts(importance_dicts, output_dir='data/output_data/imp
     output_dir : str or Path, optional
         Output directory for CSV files
     """
-    output_path = Path(output_dir)
+    # Convert to absolute path
+    output_path = resolve_data_path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
     for method, imp_dict in importance_dicts.items():
         filepath = output_path / f'{method}_importance_dict.csv'
         save_importance_dict_to_csv(imp_dict, filepath)
 
-    print(f"\n✓ All importance dictionaries saved to {output_dir}")
+    print(f"\n[OK] All importance dictionaries saved to {output_dir}")
 
 
 def save_preprocessed_data(rssi_train, coords_train, rssi_val, coords_val, ap_columns,
@@ -218,7 +269,8 @@ def save_preprocessed_data(rssi_train, coords_train, rssi_val, coords_val, ap_co
     --------
     dict : Paths to saved files
     """
-    output_path = Path(output_dir)
+    # Convert to absolute path
+    output_path = resolve_data_path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Create a pickle file for numpy arrays (faster and preserves data types)
@@ -235,7 +287,7 @@ def save_preprocessed_data(rssi_train, coords_train, rssi_val, coords_val, ap_co
     with open(pickle_path, 'wb') as f:
         pickle.dump(data_dict, f)
 
-    print(f"✓ Saved preprocessed data to pickle: {pickle_path}")
+    print(f"[OK] Saved preprocessed data to pickle: {pickle_path}")
 
     # Also save as Excel for human readability (optional, slower)
     # Save training data
@@ -256,7 +308,7 @@ def save_preprocessed_data(rssi_train, coords_train, rssi_val, coords_val, ap_co
         val_df.to_excel(writer, sheet_name='Validation', index=False)
         pd.DataFrame({'AP': ap_columns}).to_excel(writer, sheet_name='AP_Columns', index=False)
 
-    print(f"✓ Saved preprocessed data to Excel: {excel_path}")
+    print(f"[OK] Saved preprocessed data to Excel: {excel_path}")
 
     return {
         'pickle': str(pickle_path),
@@ -294,7 +346,8 @@ def load_preprocessed_data(building_id, input_dir='data/output_data/preprocessed
     >>> # Load preprocessed data for building 1
     >>> rssi_train, coords_train, rssi_val, coords_val, ap_columns = load_preprocessed_data(building_id=1)
     """
-    input_path = Path(input_dir)
+    # Convert to absolute path
+    input_path = resolve_data_path(input_dir)
 
     if use_pickle:
         # Load from pickle (faster)
@@ -309,7 +362,7 @@ def load_preprocessed_data(building_id, input_dir='data/output_data/preprocessed
         with open(pickle_path, 'rb') as f:
             data_dict = pickle.load(f)
 
-        print(f"✓ Loaded preprocessed data from pickle: {pickle_path}")
+        print(f"[OK] Loaded preprocessed data from pickle: {pickle_path}")
         print(f"  Training samples: {data_dict['rssi_train'].shape[0]}")
         print(f"  Validation samples: {data_dict['rssi_val'].shape[0]}")
         print(f"  Number of APs: {len(data_dict['ap_columns'])}")
@@ -346,7 +399,7 @@ def load_preprocessed_data(building_id, input_dir='data/output_data/preprocessed
         rssi_val = val_df[ap_columns].values
         coords_val = val_df[['LON_NORM', 'LAT_NORM', 'FLOOR']].values
 
-        print(f"✓ Loaded preprocessed data from Excel: {excel_path}")
+        print(f"[OK] Loaded preprocessed data from Excel: {excel_path}")
         print(f"  Training samples: {rssi_train.shape[0]}")
         print(f"  Validation samples: {rssi_val.shape[0]}")
         print(f"  Number of APs: {len(ap_columns)}")

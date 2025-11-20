@@ -1,0 +1,298 @@
+\documentclass[10pt,conference]{IEEEtran}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{subcaption}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{cite}
+\usepackage{hyperref}
+
+% Make URLs in references clickable
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue
+}
+
+\title{Quantum Optimization for Access Point Selection Under Budget Constraint}
+
+\author{
+
+    \IEEEauthorblockN{Mohamed Khalil Brik}
+    \IEEEauthorblockA{
+        Computer Science and Engineering\\
+        American University in Cairo\\
+        Cairo, Egypt\\
+        mohamedkhalil.brik@aucegypt.edu
+    }
+    \and
+    \IEEEauthorblockN{Ahmed Shokry}
+    \IEEEauthorblockA{
+        Computer Science and Engineering\\
+        Pennsylvania State University\\
+        PA, USA\\
+        ahmed.shokry@psu.edu 
+    }
+    \and
+    \IEEEauthorblockN{Moustafa Youssef}
+    \IEEEauthorblockA{
+        Computer Science and Engineering\\
+        American University in Cairo\\
+        Cairo, Egypt\\
+        moustafa-youssef@aucegypt.edu
+    }
+
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\boldmath
+Efficient indoor localization relies heavily on the optimal selection of Access Points (APs); however, practical deployments are often limited by budget and hardware constraints. The challenge lies in choosing a subset of APs that maximizes localization accuracy while minimizing cost. 
+This paper addresses the Access Point selection problem under budget constraints by formulating it as a Quadratic Unconstrained Binary Optimization (QUBO) problem with weighted dimensional importance. We evaluated our method using the UJIIndoorLoc dataset within a 3D environment by selecting fixed-size AP subsets to optimize accuracy. We used Simulated Quantum Annealing which achieved a mean localization error of x meters with y\% floor accuracy while reducing hardware requirements by v\% (from 520 to 50 APs). 
+\end{abstract}
+
+\begin{IEEEkeywords}
+Optimization, Quantum Computing, QUBO, Access Point selection
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Indoor positioning systems have become increasingly critical for applications ranging from navigation assistance to asset tracking and emergency response~\cite{zafari2019survey, davidson2017survey}. While Global Positioning System (GPS) technology provides excellent outdoor localization accuracy, indoor environments present unique challenges including signal attenuation, multipath interference, and the absence of satellite connectivity~\cite{liu2007survey}. Consequently, WiFi-based fingerprinting has emerged as the dominant approach for indoor localization, leveraging the ubiquity of wireless access points in modern buildings~\cite{he2016wifi, deak2012survey}. Traditional indoor localization research has primarily focused on discrete floor classification or 2D positioning within known floor levels~\cite{xia2017indoor}. However, practical applications increasingly demand continuous three-dimensional localization that can simultaneously determine horizontal coordinates (latitude, longitude) and vertical position (floor/height) with high accuracy~\cite{guo20173d, luo2014indoor}. This requirement poses significant computational and optimization challenges, particularly when constrained to selecting exactly \(k\) access points from \(n\) available candidates while maximizing localization accuracy.
+The proliferation of access points in modern buildings creates both opportunities and challenges. While dense AP coverage can theoretically improve localization accuracy, it also introduces redundancy, increases computational complexity, and dramatically raises hardware and maintenance costs~\cite{he2015efficient, kaemarungsi2004distribution}. Current approaches typically utilize all available access points without systematic optimization, leading to over-provisioned systems with marginal performance gains~\cite{li2015access}.
+
+
+This paper addresses these challenges by proposing a quantum optimization framework for intelligent Access Point Selection in 3D indoor localization. Our approach formulates the AP selection problem as a Quadratic Unconstrained Binary Optimization (QUBO) problem with cardinality constraints, ensuring exactly \(k\) APs are selected from \(n\) candidates~\cite{glover2018tutorial, lucas2014ising}. This constraint is encoded directly into the QUBO formulation, enabling D-Wave simulated annealing to identify optimal AP subsets that maximize 3D localization accuracy while strictly following budget limitations~\cite{mcgeoch2014adiabatic}. The key innovation is a weighted mutual information importance calculation that prioritizes vertical positioning accuracy through enhanced floor dimension weighting, addressing the known challenge that vertical positioning typically exhibits higher error rates than horizontal positioning due to signal propagation characteristics~\cite{liu2014role}. We demonstrate through comprehensive simulations that our quantum optimization framework achieves superior 3D localization accuracy with fewer access points compared to baseline selection strategies, validating the effectiveness of QUBO-based optimization for resource-constrained indoor positioning systems.
+
+\section{Background}
+In this section, we present the foundational concepts necessary to understand our proposed approach. We first provide a concise overview of quantum computing. Then, we introduce the fundamentals of fingerprinting-based 3D indoor localization, which constitutes the application domain of our work. 
+
+\subsection{Quantum Computing}
+
+Quantum computing is a transformative field at the intersection of computer science, physics, and mathematics. The term "quantum computing" was first introduced by physicist Yuri Manin in 1980~\cite{manin1980computable}, and later popularized by Richard Feynman in 1981~\cite{feynman1982simulating}. Feynman envisioned computers capable of simulating physical systems governed by quantum laws more efficiently than classical machines. Since then, quantum computing has evolved from a theoretical concept into a rapidly advancing research discipline. Today, it stands at the frontier of science and technology, promising groundbreaking advances in computation~\cite{nielsen2010quantum}. 
+
+Quantum computing leverages quantum bits (qubits) that, unlike classical bits, can exist in a superposition of \(|0\rangle\) and \(|1\rangle\) simultaneously, thereby exponentially expanding computational capacity~\cite{feynman1982simulating, deutsch1985quantum}. Quantum entanglement is another foundational phenomenon in which two or more qubits become intrinsically correlated, such that the state of one qubit instantaneously influences the other, regardless of spatial separation~\cite{einstein1935can, bell1964einstein}. This property enables the formation of strongly correlated quantum states, serving as a key resource underpinning many quantum algorithms~\cite{horodecki2009quantum}.
+
+Quantum annealing is a specialized paradigm within quantum computing~\cite{mcgeoch2014adiabatic, kadowaki1998quantum}, designed for solving complex optimization problems that involve identifying the best solution among an exponentially large number of possibilities. It follows the principles of adiabatic quantum computation~\cite{farhi2000quantum, albash2018adiabatic}, where a quantum system is initialized in the ground state of a simple Hamiltonian \(H_0\) and gradually evolved into the ground state of a more complex Hamiltonian \(H_f\)~\cite{aharonov2004adiabatic}. This adiabatic evolution enables the system to reach the optimal solution encoded in \(H_f\). The initial Hamiltonian \(H_0\) represents a simple, easily prepared state—typically an equal superposition of all qubits—while \(H_f\) encodes the target optimization problem~\cite{johnson2011quantum}. 
+
+This process exploits quantum phenomena such as superposition and tunneling~\cite{muthukrishnan2016tunneling} to explore the solution space more effectively than classical algorithms, potentially escaping local minima. The system’s evolution during annealing is governed by the time-dependent Schr\"{o}dinger equation~\cite{griffiths2018introduction}:
+\begin{equation}
+i\hbar\frac{\partial}{\partial t}|\psi(t)\rangle = H(t)|\psi(t)\rangle
+\end{equation}
+where \(i\) is the imaginary unit, \(\hbar\) the reduced Planck constant, \(H(t)\) the time-dependent Hamiltonian operator, and \(|\psi(t)\rangle\) the system’s quantum state at time \(t\). The Hamiltonian is typically expressed as a linear combination of \(H_0\) and \(H_f\), controlled by a time-dependent parameter \(s(t)\) that varies from 0 to 1~\cite{santoro2002theory}:
+\begin{equation}
+H(t) = (1 - s(t))H_0 + s(t)H_f
+\end{equation}
+
+This construction is central not only to quantum mechanics but also to combinatorial optimization~\cite{lucas2014ising}. Many real-world optimization problems can be expressed as Quadratic Unconstrained Binary Optimization (QUBO) formulations~\cite{kochenberger2014unconstrained, glover2018tutorial}, defined as:
+\begin{equation}
+\text{Minimize } f(\mathbf{x}) = \sum_{i,j} Q_{ij}x_ix_j + \sum_i P_ix_i    
+\end{equation}
+where \(\mathbf{x}\) is a binary vector, \(Q_{ij}\) are coefficients of the quadratic terms, and \(P_i\) are coefficients of the linear terms~\cite{boros2002pseudo}.
+
+QUBO problems can be reformulated as an Ising Hamiltonian, a model that represents magnetic interactions among atomic spins~\cite{brush1967history, barahona1982computational}. In this mapping, binary variables correspond to spin states, and the QUBO objective function maps onto the Ising energy function~\cite{choi2008minor}. This equivalence allows quantum annealers such as those developed by D-Wave to solve QUBO problems natively~\cite{boixo2014evidence, dwave2020advantage}. Quantum annealing has been applied across diverse domains including finance~\cite{orus2019quantum}, logistics~\cite{neukart2017traffic}, machine learning~\cite{nath2021review}, and network optimization~\cite{venturelli2015quantum}.
+
+\subsection{Fingerprinting in Indoor Localization}
+Three-dimensional (3D) indoor localization aims to determine a user's precise position, including horizontal coordinates and vertical height, within complex indoor environments~\cite{guo20173d, shang2022overview}. Among various approaches, fingerprinting has emerged as a leading technique due to its robustness against multipath effects and signal attenuation~\cite{he2016wifi, safwat2023fingerprinting}. Fingerprinting-based 3D localization typically operates in two phases. In the \textit{offline calibration phase}, signal characteristics such as received signal strength (RSS) and access point (AP) identifiers are collected at known locations throughout the 3D space, including different floors and heights. Each fingerprint is stored as a vector, where each entry represents the RSS from one AP, along with the corresponding 3D coordinates (latitude, longitude, and height or floor number)~\cite{guo20173d, shang2022overview}. In the \textit{online localization phase}, a user's device measures the RSS from nearby APs and forms a query fingerprint. This fingerprint is then compared to the database of stored fingerprints, and the closest match in the signal space is reported as the estimated 3D position~\cite{he2016wifi, safwat2023fingerprinting}. Recent advances leverage deep learning and sensor fusion to further improve 3D localization accuracy, especially in multi-floor and multi-building scenarios~\cite{alitaleshi2023ea, mathworks2019three}.
+
+\section{Related Work}
+
+Access point (AP) selection for indoor localization has received significant attention as researchers aim to balance localization accuracy with deployment cost. Traditional fingerprinting approaches typically rely on all available APs, leading to redundant information and unnecessary infrastructure overhead. Consequently, a substantial body of work has focused on identifying an optimal subset of APs that maintains high localization accuracy while reducing computational and deployment complexity.
+
+Several studies have explored AP or feature selection using classical optimization and statistical learning techniques. Zhou and Wieser~\cite{zhou2017jaccard} propose segmenting the region of interest into sub-regions and applying a modified Jaccard index for sub-region selection, followed by LASSO to identify a small set of informative APs. Their method achieves comparable localization accuracy using significantly fewer features. Jiang, Subakti, and Liang~\cite{jiang2021fingerprint} introduce FPFE, which employs principal component analysis (PCA) and autoencoders to extract robust features from noisy BLE/RSSI fingerprints, reducing feature dimensionality while preserving positioning accuracy. Similarly, Costa et al.~\cite{mi_online_ap_selection} present a mutual information–based online AP selection strategy, where APs with low mutual information relative to user position are dynamically pruned to improve scalability and inference speed. These classical techniques offer strong trade-offs between accuracy, computational cost, and storage requirements. 
+
+More recent work has leveraged quantum optimization to address the scalability challenges of AP selection. Shokry and Youssef~\cite{shokry2024quantum} propose \emph{A Deployable Quantum AP Selection Algorithm for Large-Scale Localization}, formulating the problem as a Quadratic Unconstrained Binary Optimization (QUBO) task solved via quantum annealing. Their method identifies the smallest subset of APs that preserves floor-level localization accuracy—selecting fewer than 14\% of APs while achieving an order-of-magnitude speedup over classical algorithms. However, their approach does not allow specifying a fixed AP budget; instead, it seeks the minimal set that maintains accuracy. Moreover, evaluation is limited to 1D floor localization.
+
+In contrast, our approach explicitly enforces a user-defined AP budget and extends evaluation to full 3D positioning, jointly balancing horizontal and vertical localization accuracy under constrained resources.
+
+
+\section{Problem Formulation}
+
+\begin{table}[h!]
+\centering
+\caption{Table of Notations}
+\label{tab:notations}
+\begin{tabular}{|c|l|}
+\hline
+\textbf{Symbol} & \textbf{Description} \\ \hline
+\( Q(\mathbf{x}, \alpha) \) & The QUBO objective function. \\ \hline
+\( \mathbf{x} \) & A binary selection vector of size \(n\). \\ \hline
+\( \alpha \) & A parameter (\(0 \le \alpha \le 1\)). \\ \hline
+\( x_i \) & \(x_i = 1\) if AP \(i\) is selected, \(0\) otherwise. \\ \hline
+\( n \) & The total number of candidate APs. \\ \hline
+\( k \) & The desired number of APs to select. \\ \hline
+\( P \) & The penalty coefficient for the constraint. \\ \hline
+\( I_i \) & The calculated importance score for AP\(i\). \\ \hline
+\( R_{ij} \) & The redundancy score between APs \(i\) and \(j\). \\ \hline
+\( r_i, r_j \) & Vectors of RSSI measurements for APs \(i\) and \(j\), respectively. \\ \hline
+\( r_{i,k} \) & The \(k\)-th RSSI measurement for AP\(i\). \\ \hline
+\( \bar{r}_i \) & The mean of the RSSI vector for AP\(i\). \\ \hline
+\( N \) & The total number of RSSI measurements per vector. \\ \hline
+\end{tabular}
+\end{table}
+
+Assume a fingerprint-based indoor localization system with $m$ samples and $n$ candidate access points (APs). For each sample $i \in \{1, \dots, m\}$, the observed measurement consists of an RSS vector $r^i \in \mathbb{R}^n$ and a normalized 3D coordinate label $y^i \in \mathbb{R}^3$, where the labeling function combines latitude, longitude, and scaled floor height as follows:
+\begin{equation}
+y^i = \mathrm{normalize}\left(\mathrm{LATI}^i, \mathrm{LONG}^i, \mathrm{FLOOR}^i \cdot h_{\mathrm{floor}}\right)
+\label{eq:coordinate_normalization}
+\end{equation}
+
+with $h_{\mathrm{floor}}$ denoting the inter-floor height.
+
+Let $\mathcal{D} = \{ (r^i, y^i) \}_{i=1}^{m}$ be the dataset.
+The goal is to select exactly $k$ APs (AP budget constraint), encoded by a binary selection vector $\mathbf{x} = (x_1, ..., x_n)\in\{0, 1\}^n$ subject to
+\begin{equation}
+\sum_{j=1}^{n} x_j = k
+\label{eq:selection_constraint}
+\end{equation}
+
+such that localization accuracy using the reduced fingerprint vector $r^i_S = [ r^i_j : x_j = 1 ] \in \mathbb{R}^k$ remains maximized.
+
+To this end, we define the following Quadratic Unconstrained Binary Optimization (QUBO) objective:
+
+\begin{multline}
+Q(\mathbf{x}, \alpha) = \\
+-\alpha \sum_{i=1}^{n} I_i x_i + (1-\alpha) \sum_{i=1}^{n} \sum_{j>i} R_{ij} x_i x_j + P \left(\sum_{i=1}^{n} x_i - k\right)^2
+\end{multline}
+
+The QUBO objective function \( Q(\mathbf{x}, \alpha) \) is defined over a binary selection vector \( \mathbf{x} \), where each element \( x_i \) indicates whether access point \( i \) is selected (\( x_i = 1 \)) or not (\( x_i = 0 \)). The term \( I_i \) represents the weighted importance score of access point \( i \), quantifying its individual contribution to localization accuracy; this forms the importance component of the objective, weighted by the parameter \( \alpha \). The redundancy between access points \( i \) and \( j \) is captured by \( R_{ij} \), which measures the correlation between their signals; this constitutes the redundancy part of the objective, scaled by \( 1-\alpha \) to balance against importance. The parameter \( \alpha \) thus controls the trade-off between maximizing the total importance of selected access points and minimizing their mutual redundancy. To enforce the selection of exactly \( k \) access points, the penalty term \( P \left(\sum_{i=1}^{n} x_i - k\right)^2 \) is included, where \( P \) is an adaptive weight that ensures the constraint is satisfied. 
+
+The optimal subset, $\mathbf{x}^*$, is then obtained as:
+\begin{equation}
+\mathbf{x}^* = 
+\arg\min_{\substack{\mathbf{x} \in \{0, 1\}^n \\[2pt] \sum_{j=1}^{n} x_j = k}} 
+Q(\mathbf{x}, \alpha).
+\label{eq:qubo_minimization}
+\end{equation}
+
+
+
+
+This formulation enables integration with modern quantum and classical QUBO solvers, supporting scalable optimization under practical deployment constraints.
+
+
+
+\subsection{Importance Metrics}
+
+\textbf{Entropy-Based Importance:} This metric measures the Shannon entropy of each AP's RSSI distribution, quantifying the uncertainty or variability in signal strength readings. For AP \(i\) with RSSI probability distribution \(p(r_{i,k})\), the importance is defined as:
+\begin{equation}
+I_i^{\text{ENT}} = -\sum_{k} p(r_{i,k}) \log_2 p(r_{i,k})
+\end{equation}
+Higher entropy indicates more diverse signal patterns, potentially useful for distinguishing locations, though this metric does not explicitly consider the relationship with spatial coordinates.
+
+\textbf{Variance-Based Importance:} The variance metric captures the spread of RSSI measurements for each AP across all fingerprint locations:
+\begin{equation}
+I_i^{\text{VAR}} = \frac{1}{N-1}\sum_{k=1}^{N} (r_{i,k} - \bar{r}_i)^2
+\end{equation}
+where \(N\) is the total number of RSSI measurements per vector and \(\bar{r}_i\) is the mean RSSI for AP \(i\) (see Table~\ref{tab:notations}). APs with high variance exhibit location-dependent signal characteristics, while low-variance APs provide little discriminative information.
+
+\textbf{Average RSSI Importance:} This straightforward metric uses the mean received signal strength as a proxy for AP importance:
+\begin{equation}
+I_i^{\text{AVG}} = \frac{1}{N}\sum_{k=1}^{N} r_{i,k}
+\end{equation}
+This approach assumes that APs with stronger average signals are more reliable and contribute more to localization accuracy, though it ignores spatial variation patterns.
+
+\textbf{Median RSSI Importance:} Similar to the average metric but more robust to outliers, the median importance is defined as:
+\begin{equation}
+I_i^{\text{MED}} = \text{median}(r_{i,1}, r_{i,2}, \ldots, r_{i,N})
+\end{equation}
+This metric provides a central tendency measure less sensitive to extreme RSSI values caused by interference or measurement errors.
+
+\textbf{Maximum RSSI Importance:} This metric identifies APs based on their peak signal strength:
+\begin{equation}
+I_i^{\text{MAX}} = \max_{k=1,\ldots,N} r_{i,k}
+\end{equation}
+It assumes that APs with the highest maximum signal strength have better coverage and signal quality, potentially leading to more accurate localization.
+
+\subsection{Redundancy Metric}
+
+To quantify the pairwise redundancy between access points (APs), we compute a correlation matrix using the Pearson correlation coefficient applied to the received signal strength indicator (RSSI) data. Specifically, we consider only those APs with non-zero importance scores to ensure relevance. For each pair of relevant APs \(i\) and \(j\), the absolute value of the Pearson correlation coefficient between their RSSI vectors is calculated, producing a symmetric redundancy matrix \(R\) where each element \(R_{ij}\) represents the degree of redundancy between the corresponding APs. High values of \(R_{ij}\) indicate strong correlation and thus potential redundancy, which the selection algorithm aims to minimize to avoid overlapping or dependent information contributions.
+
+\begin{equation}
+R_{ij} = \left| \text{Corr}(r_i, r_j) \right| = \left|
+\frac{\sum_{k=1}^{N} (r_{i,k} - \bar{r}_i)(r_{j,k} - \bar{r}_j)}{\sqrt{\sum_{k=1}^{N}(r_{i,k} - \bar{r}_i)^2 \sum_{k=1}^{N}(r_{j,k} - \bar{r}_j)^2}}
+\right|
+\end{equation}
+
+
+
+
+
+
+
+\section{Evaluation}
+
+\subsection{Experiment Setup}
+
+The dataset used for evaluation comprises 21,048 total samples, divided into 19,937 training samples and 1,111 validation samples. The data was collected across 3 buildings with 520 WiFi access points (APs) deployed throughout the environment. The dataset includes signal measurements from 18 unique users using 16 different phone devices. The training data spans from May 30, 2013 to June 20, 2013, while the validation data covers the period from September 19, 2013 to October 8, 2013~\cite{torres2014ujiindoorloc}. For our experiments, we focused on Building 1, which consists of 4 floors~\cite{torres2014ujiindoorloc}. The experiments were conducted on a machine equipped with a 12th Gen Intel(R) Core(TM) i7-12700H processor running at 2.30 GHz and 16.0 GB of RAM, operating on a 64-bit Windows system with x64-based processor architecture. We used the Random Forest Classifier~\cite{breiman2001random} as a classification model for 3D localization.
+
+
+
+
+
+
+
+
+
+
+
+\section{Results}
+
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.5\textwidth]{redundancy.png}
+\caption{AP redundancy matrix (correlation) for Building 1.}
+\label{fig:ap_redundancy}
+\end{figure}
+
+
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.5\textwidth]{AP_importance.png}
+\caption{Importance scores for all APs in Building 1. The distribution shows that most APs exhibit low importance, while a subset demonstrates high relevance for 3D localization.}
+\label{fig:ap_importance}
+\end{figure}
+
+\subsection{Effect of Parameters}
+
+\subsection{Hyperparameter Sensitivity Analysis}
+
+\subsection{Impact of Alpha}
+\subsection{Impact of budget}
+\subsection{Impact of Number of Reads}
+\subsection{Impact of Number of Sweeps}
+
+
+
+
+\subsection{Comparison with Classical Methods}
+Greedy sequential selection, simulated annealing
+\subsubsection{Time}
+\subsubsection{3D localization Accuracy}
+\subsubsection{Floor localization Accuracy}
+
+\section{Discussion}
+
+
+
+
+\section{Conclusion}
+This paper presents a novel quantum optimization framework for access point selection in indoor localization systems under strict budget constraints. We formulated the AP selection problem as a Quadratic Unconstrained Binary Optimization (QUBO) problem with cardinality constraints, ensuring exactly \(k\) APs are selected from \(n\) candidates. Our experimental evaluation on the UJIIndoorLoc dataset demonstrates the effectiveness of quantum annealing for resource-constrained 3D indoor localization. Using only \textbf{[X]} selected access points out of 520 available APs, a reduction of \textbf{[V]\%}. Our approach achieved a mean 3D localization error of \textbf{[X.XX]} meters and floor classification accuracy of \textbf{[YY.Y]\%}. These results represent a \textbf{[Z]\%} improvement in localization accuracy compared to random AP selection while maintaining computational efficiency. 
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
