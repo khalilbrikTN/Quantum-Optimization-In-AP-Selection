@@ -1,0 +1,65 @@
+% Tables for Importance Metrics Comparison
+% This file contains LaTeX code for two tables corresponding to the figures in the paper
+
+% Table 1: 3D Positioning Error Comparison
+\begin{table}[h!]
+\centering
+\caption{Mean 3D Positioning Error Comparison Across Importance Metrics (k=20 APs)}
+\label{tab:error_comparison}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Importance Method} & \textbf{Mean 3D Error (m)} & \textbf{Median 3D Error (m)} & \textbf{Max Error (m)} \\
+\midrule
+Entropy           & 16.998 & 11.578 & 75.044 \\
+Variance          & 17.587 & 13.526 & 70.357 \\
+Max               & 17.934 & 13.979 & 72.255 \\
+Average           & 18.289 & 12.356 & 124.482 \\
+Mutual Info       & 18.583 & 13.622 & 83.001 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% Table 2: Floor Classification Accuracy Comparison
+\begin{table}[h!]
+\centering
+\caption{Floor Classification Accuracy Comparison Across Importance Metrics (k=20 APs)}
+\label{tab:floor_comparison}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Importance Method} & \textbf{Exact Floor (\%)} & \textbf{±1 Floor (\%)} & \textbf{±2 Floors (\%)} \\
+\midrule
+Mutual Info       & 69.38 & 97.39 & 100.00 \\
+Variance          & 66.45 & 94.46 & 99.67 \\
+Entropy           & 66.12 & 98.37 & 100.00 \\
+Max               & 65.80 & 96.09 & 99.67 \\
+Average           & 58.63 & 96.09 & 99.67 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% Alternative: Combined table with both metrics
+\begin{table*}[t]
+\centering
+\caption{Comprehensive Performance Comparison Across Importance Metrics (k=20 APs selected from 520 total APs)}
+\label{tab:comprehensive_comparison}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Importance} & \multicolumn{3}{c}{\textbf{3D Positioning Error (m)}} & \multicolumn{3}{c}{\textbf{Floor Accuracy (\%)}} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+\textbf{Method} & \textbf{Mean} & \textbf{Median} & \textbf{Max} & \textbf{Exact} & \textbf{±1 Floor} & \textbf{±2 Floors} \\
+\midrule
+Entropy           & 16.998 & 11.578 & 75.044  & 66.12 & 98.37 & 100.00 \\
+Variance          & 17.587 & 13.526 & 70.357  & 66.45 & 94.46 & 99.67  \\
+Max               & 17.934 & 13.979 & 72.255  & 65.80 & 96.09 & 99.67  \\
+Average           & 18.289 & 12.356 & 124.482 & 58.63 & 96.09 & 99.67  \\
+Mutual Info       & 18.583 & 13.622 & 83.001  & 69.38 & 97.39 & 100.00 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+% Notes:
+% - Use \begin{table}[h!] for single-column tables
+% - Use \begin{table*}[t] for two-column spanning tables (recommended for IEEE format)
+% - Requires \usepackage{booktabs} in the preamble
+% - Best performing values could be highlighted using \textbf{}
+% - Floor accuracy values are sorted by exact floor accuracy in Table 2
